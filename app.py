@@ -200,4 +200,35 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                 l_col_idx = df_box.columns.get_loc('Leak') + 1
                 data_box_l = Reference(ws_data, min_col=l_col_idx, min_row=1, max_row=len(df_box)+1)
                 chart_box_l.add_data(data_box_l, titles_from_data=True)
-                ws_chart.add_chart(chart_box_l, "K3")wb_box.save(output_box_excel)output_box_excel.seek(0)# 下載按鈕st.download_button(label="📥 點此下載內含 Excel 內建盒鬚圖（Box Plot）的正式報告",data=output_box_excel,file_name="Leak_Test_Native_Box_Plot.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")st.write("---")# 前端網頁的 Plotly 盒鬚圖渲染 (不變)graph_col1, graph_col2 = st.columns(2)with graph_col1:st.markdown("#### 📦 Pressure (Kpa) 箱線分佈圖")fig_box_press = px.box(df_box, y="Pressure(Kpa)", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})st.plotly_chart(fig_box_press, use_container_width=True)with graph_col2:st.markdown("#### 📦 Leak 箱線分佈圖")fig_box_leak = px.box(df_box, y="Leak", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})st.plotly_chart(fig_box_leak, use_container_width=True)except Exception as e:st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
+                ws_chart.add_chart(chart_box_l, "K3")wb_box.save(output_box_excel)output_box_excel.seek(0)# 下載按鈕
+                                # 這裡就是下載按鈕
+                st.download_button(
+                    label="📥 點此下載內含 Excel 內建盒鬚圖（Box Plot）的正式報告",
+                    data=output_box_excel,
+                    file_name="Leak_Test_Native_Box_Plot.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                st.write("---")
+                
+                # 前端網頁的 Plotly 箱線圖佈局
+                graph_col1, graph_col2 = st.columns(2)
+                with graph_col1:
+                    st.markdown("#### 📦 Pressure (Kpa) 箱線分佈圖")
+                    fig_box_press = px.box(
+                        df_box, y="Pressure(Kpa)", points="all", hover_data=["SN"], 
+                        color="bResult" if "bResult" in df_box.columns else None, 
+                        color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"}
+                    )
+                    st.plotly_chart(fig_box_press, use_container_width=True)
+                    
+                with graph_col2:
+                    st.markdown("#### 📦 Leak 箱線分佈圖")
+                    fig_box_leak = px.box(
+                        df_box, y="Leak", points="all", hover_data=["SN"], 
+                        color="bResult" if "bResult" in df_box.columns else None, 
+                        color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"}
+                    )
+                    st.plotly_chart(fig_box_leak, use_container_width=True)
+                    
+        except Exception as e:
+            st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
