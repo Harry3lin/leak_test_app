@@ -194,18 +194,18 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                 ws_chart.add_chart(chart_box_p, "C3")
                 
                 # 2. 建立 Leak 盒鬚圖
-                chart_box_l = StockChart()
+                                chart_box_l = StockChart()
                 chart_box_l.title = "Leak Box Plot (Excel Native)"
                 chart_box_l.y_axis.title = "Leak Value"
                 l_col_idx = df_box.columns.get_loc('Leak') + 1
                 data_box_l = Reference(ws_data, min_col=l_col_idx, min_row=1, max_row=len(df_box)+1)
                 chart_box_l.add_data(data_box_l, titles_from_data=True)
-                 ws_chart.add_chart(chart_box_l, "K3")
+                ws_chart.add_chart(chart_box_l, "K3")
                 
                 wb_box.save(output_box_excel)
                 output_box_excel.seek(0)
                 
-                                # 這裡就是下載按鈕
+                # 下載按鈕
                 st.download_button(
                     label="📥 點此下載內含 Excel 內建盒鬚圖（Box Plot）的正式報告",
                     data=output_box_excel,
@@ -236,3 +236,4 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                     
         except Exception as e:
             st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
+
