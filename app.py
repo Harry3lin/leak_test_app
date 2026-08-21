@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import px = px if 'px' in locals() else plotly.express # 防呆機制
 import plotly.express as px
 import io
 from openpyxl import Workbook
