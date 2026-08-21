@@ -4,7 +4,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import io
 from openpyxl import Workbook
-from openpyxl.chart import LineChart, Reference, BarChart
+# 核心升級：引入真正的 ScatterChart (XY 散佈圖) 與專用的 Series 數據對象
+from openpyxl.chart import ScatterChart, Reference, Series, BarChart
 
 # 1. 設定網頁標題與配置
 st.set_page_config(page_title="氣密測試數據自動化分析看板", layout="wide")
@@ -20,7 +21,7 @@ app_mode = st.radio(
 st.write("---")
 
 # ==============================================================================
-# 模式一：Line Plot 趨勢曲線（優化：強制顯示座標軸數值刻度、上限加入安全緩衝）
+# 模式一：Line Plot 趨勢曲線（終極優化：改用 ScatterChart 解鎖 Excel 軸線刻度數值）
 # ==============================================================================
 if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
     st.subheader("趨勢曲線分析 (Line Plot)")
@@ -63,77 +64,75 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                     sheet_name = short_sn[-30:]
                     
                     ws = wb.create_sheet(title=sheet_name)
-                    headers = ['Timestamp', 'Pressure(Kpa)', 'Leak', 'bResult']
+                    # 為了讓 ScatterChart 能夠畫出刻度，我們在 Excel 裡多放一個 'Index' 欄位作為 X 軸數值
+                    headers = ['Index', 'Timestamp', 'Pressure(Kpa)', 'Leak', 'bResult']
                     ws.append(headers)
                     
-                    for _, row in sn_data.iterrows():
+                    # 寫入資料，並自動附帶從 1 開始的數字索引
+                    for idx, (_, row) in enumerate(sn_data.iterrows(), start=1):
                         ws.append([
+                            idx,
                             str(row['Timestamp']), 
                             row['Pressure(Kpa)'], 
                             row['Leak'] if pd.notna(row['Leak']) else "", 
                             row['bResult'] if 'bResult' in df.columns else ""
                         ])
                     
-                    # 計算動態最大值
+                    num_rows = len(sn_data)
+                    
+                    # 計算動態最大值緩衝
                     raw_max_p = float(sn_data['Pressure(Kpa)'].max()) if not sn_data['Pressure(Kpa)'].dropna().empty else 100.0
                     raw_max_l = float(sn_data['Leak'].max()) if not sn_data['Leak'].dropna().empty else 1.0
+                    max_p = raw_max_p * 1.08 if raw_max_p > 0 else raw_max_p * 0.92
+                    max_l = raw_max_l * 1.12 if raw_max_l > 0 else raw_max_l * 0.88
                     
-                    # 【核心修正】加入 5% ~ 10% 的上限安全緩衝空間，給 Excel 留出渲染最高數值刻度的空間
-                    max_p = raw_max_p * 1.05 if raw_max_p > 0 else raw_max_p * 0.95
-                    max_l = raw_max_l * 1.10 if raw_max_l > 0 else raw_max_l * 0.90
-                    
-                    # ----------------- 建立 Excel 壓力折線圖 -----------------
-                    chart_p = LineChart()
+                    # ----------------- 建立 Excel 壓力散佈折線圖 -----------------
+                    chart_p = ScatterChart()
                     chart_p.title = f"SN {sheet_name} - Pressure Trend"
                     chart_p.style = 13
+                    chart_p.width = 26   # 雙倍大寬度
+                    chart_p.height = 14  # 高度
                     
-                    chart_p.width = 26   # 寬度放大 100%
-                    chart_p.height = 15  # 高度調整
-                    
-                    chart_p.x_axis.title = "Timestamp (Time)"
+                    chart_p.x_axis.title = "Data Point Index (Time)"
                     chart_p.y_axis.title = "Pressure (Kpa)"
-                    
-                    # 將帶有緩衝的最大值設定為圖的上限
                     chart_p.y_axis.scaling.max = max_p
-                    
-                    # 【核心修正】強制指定顯示 X 軸與 Y 軸的數值標籤與刻度線
-                    chart_p.x_axis.tickLblPos = "nextTo"
-                    chart_p.y_axis.tickLblPos = "nextTo"
-                    chart_p.x_axis.majorTickMark = "out"
-                    chart_p.y_axis.majorTickMark = "out"
-                    
                     chart_p.legend = None  # 移除右側 1~10 綠線
                     
-                    data_p = Reference(ws, min_col=2, min_row=1, max_row=len(sn_data)+1)
-                    chart_p.add_data(data_p, titles_from_data=True)
-                    ws.add_chart(chart_p, "F2")
+                    # 定義 XY 散佈圖的數據參照 (X 軸為第 1 欄 Index，Y 軸為第 3 欄 Pressure)
+                    x_values_p = Reference(ws, min_col=1, min_row=2, max_row=num_rows+1)
+                    y_values_p = Reference(ws, min_col=3, min_row=1, max_row=num_rows+1)
                     
-                    # ----------------- 建立 Excel 洩漏率折線圖 -----------------
+                    series_p = Series(y_values_p, x_values_p, title_from_data=True)
+                    # 設定圖表外觀為折線（無資料點標記，避免畫面太雜）
+                    series_p.graphicalProperties.line.solidFill = "1F77B4" # 經典科技藍
+                    series_p.graphicalProperties.line.width = 25000       # 線條粗細
+                    
+                    chart_p.append(series_p)
+                    ws.add_chart(chart_p, "G2")
+                    
+                    # ----------------- 建立 Excel 洩漏率散佈折線圖 -----------------
                     if not sn_data['Leak'].dropna().empty:
-                        chart_l = LineChart()
+                        chart_l = ScatterChart()
                         chart_l.title = f"SN {sheet_name} - Leak Trend"
                         chart_l.style = 13
-                        
                         chart_l.width = 26
-                        chart_l.height = 15
+                        chart_l.height = 14
                         
-                        chart_l.x_axis.title = "Timestamp (Time)"
+                        chart_l.x_axis.title = "Data Point Index (Time)"
                         chart_l.y_axis.title = "Leak Value"
-                        
-                        # 將帶有緩衝的最大值設定為圖的上限
                         chart_l.y_axis.scaling.max = max_l
-                        
-                        # 強制指定顯示刻度與數值
-                        chart_l.x_axis.tickLblPos = "nextTo"
-                        chart_l.y_axis.tickLblPos = "nextTo"
-                        chart_l.x_axis.majorTickMark = "out"
-                        chart_l.y_axis.majorTickMark = "out"
-                        
                         chart_l.legend = None
                         
-                        data_l = Reference(ws, min_col=3, min_row=1, max_row=len(sn_data)+1)
-                        chart_l.add_data(data_l, titles_from_data=True)
-                        ws.add_chart(chart_l, "F20")
+                        # 定義 XY 散佈圖的數據參照 (X 軸為第 1 欄 Index，Y 軸為第 4 欄 Leak)
+                        x_values_l = Reference(ws, min_col=1, min_row=2, max_row=num_rows+1)
+                        y_values_l = Reference(ws, min_col=4, min_row=1, max_row=num_rows+1)
+                        
+                        series_l = Series(y_values_l, x_values_l, title_from_data=True)
+                        series_l.graphicalProperties.line.solidFill = "FF7F0E" # 活潑亮眼橘
+                        series_l.graphicalProperties.line.width = 25000
+                        
+                        chart_l.append(series_l)
+                        ws.add_chart(chart_l, "G18") # 垂直整齊排列
                 
                 wb.save(output_excel)
                 output_excel.seek(0)
