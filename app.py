@@ -114,14 +114,14 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                         
                         st.write("---")
                         
-                        # Pressure 獨立圖表 (已修復 hover 與新版語法)
+                        # Pressure 獨立圖表
                         st.markdown("#### 📈 Pressure (Kpa) 趨勢變化圖")
                         fig_press = go.Figure()
                         fig_press.add_trace(go.Scatter(x=plot_data['Timestamp'], y=plot_data['Pressure(Kpa)'], name='Pressure', mode='lines+markers', line=dict(color='#1f77b4', width=2), marker=dict(size=5)))
                         fig_press.update_layout(xaxis=dict(title="Timestamp"), yaxis=dict(title="Pressure (Kpa)"), hovermode="closest")
                         st.plotly_chart(fig_press, use_container_width=True)
                         
-                        # Leak 獨立圖表 (已修復 hover 與新版語法)
+                        # Leak 獨立圖表
                         st.markdown("#### 📉 Leak 趨勢變化圖")
                         if not sn_data['Leak'].dropna().empty:
                             fig_leak = go.Figure()
