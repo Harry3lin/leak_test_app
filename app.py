@@ -194,7 +194,7 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                 ws_chart.add_chart(chart_box_p, "C3")
                 
                 # 2. 建立 Leak 盒鬚圖
-                                chart_box_l = StockChart()
+                chart_box_l = StockChart()
                 chart_box_l.title = "Leak Box Plot (Excel Native)"
                 chart_box_l.y_axis.title = "Leak Value"
                 l_col_idx = df_box.columns.get_loc('Leak') + 1
