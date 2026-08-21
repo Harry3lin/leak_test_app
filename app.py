@@ -199,4 +199,4 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                 output_box_excel.seek(0)
                 
                 st.write("---")
-                st.download_button(
+                st.download_button(label="📥 點此下載 Box Plot 原始統計 Excel 報表",data=output_box_excel,file_name="Leak_Test_Box_Plot_Summary.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")except Exception as e:st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
