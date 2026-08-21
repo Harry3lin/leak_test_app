@@ -20,7 +20,7 @@ app_mode = st.radio(
 st.write("---")
 
 # ==============================================================================
-# 模式一：Line Plot 趨勢曲線（優化：Excel 圖表尺寸放大、座標軸補齊、最大值限制）
+# 模式一：Line Plot 趨勢曲線（優化：強制顯示座標軸數值刻度、上限加入安全緩衝）
 # ==============================================================================
 if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
     st.subheader("趨勢曲線分析 (Line Plot)")
@@ -74,28 +74,35 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                             row['bResult'] if 'bResult' in df.columns else ""
                         ])
                     
-                    # 計算動態最大值作為圖表上限
-                    max_p = float(sn_data['Pressure(Kpa)'].max()) if not sn_data['Pressure(Kpa)'].dropna().empty else 100.0
-                    max_l = float(sn_data['Leak'].max()) if not sn_data['Leak'].dropna().empty else 1.0
+                    # 計算動態最大值
+                    raw_max_p = float(sn_data['Pressure(Kpa)'].max()) if not sn_data['Pressure(Kpa)'].dropna().empty else 100.0
+                    raw_max_l = float(sn_data['Leak'].max()) if not sn_data['Leak'].dropna().empty else 1.0
+                    
+                    # 【核心修正】加入 5% ~ 10% 的上限安全緩衝空間，給 Excel 留出渲染最高數值刻度的空間
+                    max_p = raw_max_p * 1.05 if raw_max_p > 0 else raw_max_p * 0.95
+                    max_l = raw_max_l * 1.10 if raw_max_l > 0 else raw_max_l * 0.90
                     
                     # ----------------- 建立 Excel 壓力折線圖 -----------------
                     chart_p = LineChart()
                     chart_p.title = f"SN {sheet_name} - Pressure Trend"
                     chart_p.style = 13
                     
-                    # 1. 放大圖表尺寸
                     chart_p.width = 26   # 寬度放大 100%
                     chart_p.height = 15  # 高度調整
                     
-                    # 2. 新增 X-Y 軸的數值單位
                     chart_p.x_axis.title = "Timestamp (Time)"
                     chart_p.y_axis.title = "Pressure (Kpa)"
                     
-                    # 3. 將最大值設定為圖的上限
+                    # 將帶有緩衝的最大值設定為圖的上限
                     chart_p.y_axis.scaling.max = max_p
                     
-                    # 4. 移除多餘圖例 (消滅右側 1~10 綠線)
-                    chart_p.legend = None
+                    # 【核心修正】強制指定顯示 X 軸與 Y 軸的數值標籤與刻度線
+                    chart_p.x_axis.tickLblPos = "nextTo"
+                    chart_p.y_axis.tickLblPos = "nextTo"
+                    chart_p.x_axis.majorTickMark = "out"
+                    chart_p.y_axis.majorTickMark = "out"
+                    
+                    chart_p.legend = None  # 移除右側 1~10 綠線
                     
                     data_p = Reference(ws, min_col=2, min_row=1, max_row=len(sn_data)+1)
                     chart_p.add_data(data_p, titles_from_data=True)
@@ -107,23 +114,26 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                         chart_l.title = f"SN {sheet_name} - Leak Trend"
                         chart_l.style = 13
                         
-                        # 1. 放大圖表尺寸
                         chart_l.width = 26
                         chart_l.height = 15
                         
-                        # 2. 新增 X-Y 軸的數值單位
                         chart_l.x_axis.title = "Timestamp (Time)"
                         chart_l.y_axis.title = "Leak Value"
                         
-                        # 3. 將最大值設定為圖的上限
+                        # 將帶有緩衝的最大值設定為圖的上限
                         chart_l.y_axis.scaling.max = max_l
                         
-                        # 4. 移除多餘圖例
+                        # 強制指定顯示刻度與數值
+                        chart_l.x_axis.tickLblPos = "nextTo"
+                        chart_l.y_axis.tickLblPos = "nextTo"
+                        chart_l.x_axis.majorTickMark = "out"
+                        chart_l.y_axis.majorTickMark = "out"
+                        
                         chart_l.legend = None
                         
                         data_l = Reference(ws, min_col=3, min_row=1, max_row=len(sn_data)+1)
                         chart_l.add_data(data_l, titles_from_data=True)
-                        ws.add_chart(chart_l, "F20") # 改放下方，排版不擁擠
+                        ws.add_chart(chart_l, "F20")
                 
                 wb.save(output_excel)
                 output_excel.seek(0)
@@ -136,7 +146,7 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                 )
                 st.write("---")
                 
-                # 前端 Tabs 網頁渲染 (保持不變)
+                # 前端 Tabs 網頁渲染
                 tabs = st.tabs([f"SN: {sn.split(':')[-1] if ':' in str(sn) else sn}" for sn in unique_sns])
                 for i, sn in enumerate(unique_sns):
                     with tabs[i]:
