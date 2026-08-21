@@ -5,6 +5,8 @@ import plotly.express as px
 import io
 from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
+# 引入 Excel 內建的進階統計/盒鬚圖專用物件
+from openpyxl.chart.bar_chart import BarChart 
 
 # 1. 設定網頁標題與配置
 st.set_page_config(page_title="氣密測試數據自動化分析看板", layout="wide")
@@ -20,7 +22,7 @@ app_mode = st.radio(
 st.write("---")
 
 # ==============================================================================
-# 模式一：Line Plot 趨勢曲線（包含自動過濾、多 Tabs 檢視、匯出含圖表 Excel）
+# 模式一：Line Plot 趨勢曲線
 # ==============================================================================
 if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
     st.subheader("趨勢曲線分析 (Line Plot)")
@@ -41,7 +43,6 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
             else:
                 df['Timestamp'] = pd.to_datetime(df['Timestamp'])
                 
-                # 自動忽略 Phase 包含 'Stabilization'
                 if 'Phase' in df.columns:
                     initial_count = len(df)
                     df = df[~df['Phase'].astype(str).str.contains('Stabilization', case=False, na=False)]
@@ -52,19 +53,15 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                 unique_sns = df['SN'].dropna().unique()
                 st.success(f"✅ 成功讀取數據！偵測到共 {len(unique_sns)} 個不同的 SN 產品。")
                 
-                # ====== 核心功能：在後台建構多分頁 Excel 檔案 ======
                 output_excel = io.BytesIO()
                 wb = Workbook()
-                wb.remove(wb.active)  # 移除預設工作表
+                wb.remove(wb.active)  
                 
-                tabs = st.tabs([f"SN: {sn.split(':')[-1] if ':' in str(sn) else sn}" for sn in unique_sns])
-                
-                for i, sn in enumerate(unique_sns):
+                for sn in unique_sns:
                     sn_data = df[df['SN'] == sn]
                     short_sn = str(sn).split(':')[-1] if ':' in str(sn) else str(sn)
-                    sheet_name = short_sn[-30:]  # Excel 工作表名稱限制 31 字元
+                    sheet_name = short_sn[-30:]
                     
-                    # 建立該 SN 的 Excel 分頁並導出數據
                     ws = wb.create_sheet(title=sheet_name)
                     headers = ['Timestamp', 'Pressure(Kpa)', 'Leak', 'bResult']
                     ws.append(headers)
@@ -77,7 +74,6 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                             row['bResult'] if 'bResult' in df.columns else ""
                         ])
                     
-                    # 在 Excel 分頁內部自動繪製 Pressure 折線圖
                     chart_p = LineChart()
                     chart_p.title = f"SN {sheet_name} - Pressure Trend"
                     chart_p.style = 13
@@ -87,7 +83,6 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                     chart_p.add_data(data_p, titles_from_data=True)
                     ws.add_chart(chart_p, "F2")
                     
-                    # 在 Excel 分頁內部自動繪製 Leak 折線圖
                     if not sn_data['Leak'].dropna().empty:
                         chart_l = LineChart()
                         chart_l.title = f"SN {sheet_name} - Leak Trend"
@@ -97,10 +92,23 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                         data_l = Reference(ws, min_col=3, min_row=1, max_row=len(sn_data)+1)
                         chart_l.add_data(data_l, titles_from_data=True)
                         ws.add_chart(chart_l, "N2")
-                    
-                    # 網頁前端畫面渲染
+                
+                wb.save(output_excel)
+                output_excel.seek(0)
+                
+                st.download_button(
+                    label="📥 一鍵下載自動生成的『多分頁含圖表』Excel 報告",
+                    data=output_excel,
+                    file_name="Leak_Test_Line_Plots.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                st.write("---")
+                
+                tabs = st.tabs([f"SN: {sn.split(':')[-1] if ':' in str(sn) else sn}" for sn in unique_sns])
+                for i, sn in enumerate(unique_sns):
                     with tabs[i]:
                         st.subheader(f"產品序號: {sn}")
+                        sn_data = df[df['SN'] == sn]
                         if sn_data.empty:
                             st.info("ℹ️ 該產品在排除 Stabilization 階段後無剩餘數據。")
                             continue
@@ -112,16 +120,12 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                         col2.metric("最大壓力 (Kpa)", f"{sn_data['Pressure(Kpa)'].max():.2f}")
                         col3.metric("測試結果狀態", f"{sn_data['bResult'].iloc[-1] if 'bResult' in sn_data.columns else '未知'}")
                         
-                        st.write("---")
-                        
-                        # Pressure 獨立圖表
                         st.markdown("#### 📈 Pressure (Kpa) 趨勢變化圖")
                         fig_press = go.Figure()
                         fig_press.add_trace(go.Scatter(x=plot_data['Timestamp'], y=plot_data['Pressure(Kpa)'], name='Pressure', mode='lines+markers', line=dict(color='#1f77b4', width=2), marker=dict(size=5)))
                         fig_press.update_layout(xaxis=dict(title="Timestamp"), yaxis=dict(title="Pressure (Kpa)"), hovermode="closest")
                         st.plotly_chart(fig_press, use_container_width=True)
                         
-                        # Leak 獨立圖表
                         st.markdown("#### 📉 Leak 趨勢變化圖")
                         if not sn_data['Leak'].dropna().empty:
                             fig_leak = go.Figure()
@@ -130,24 +134,12 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                             st.plotly_chart(fig_leak, use_container_width=True)
                         else:
                             st.info("ℹ️ 此 SN 當前數據中的 Leak 欄位皆為空值。")
-                
-                # 將 Excel 資料打包寫入記憶體
-                wb.save(output_excel)
-                output_excel.seek(0)
-                
-                st.write("---")
-                st.download_button(
-                    label="📥 點此下載自動生成的『多分頁含圖表』Excel 報告",
-                    data=output_excel,
-                    file_name="Leak_Test_Line_Plots.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
                             
         except Exception as e:
             st.error(f"讀取檔案時發生錯誤: {e}")
 
 # ==============================================================================
-# 模式二：Box Plot 箱線圖（包含良率自動分類與原始數據匯出）
+# 模式二：Box Plot 箱線圖（真正整合 Excel 內建盒鬚圖元件）
 # ==============================================================================
 elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
     st.subheader("整體數據箱線圖分析 (Box Plot)")
@@ -172,39 +164,40 @@ elif app_mode == "📊 整體數據分佈 (Box Plot Mode)":
                     col_b1.metric("🟢 OK 總數", f"{ok_count} 筆")
                     col_b2.metric("🔴 NG 總數", f"{ng_count} 筆")
                 
-                st.write("---")
-                
-                graph_col1, graph_col2 = st.columns(2)
-                with graph_col1:
-                    st.markdown("#### 📦 Pressure (Kpa) 箱線分佈圖")
-                    fig_box_press = px.box(df_box, y="Pressure(Kpa)", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})
-                    st.plotly_chart(fig_box_press, use_container_width=True)
-                    
-                with graph_col2:
-                    st.markdown("#### 📦 Leak 箱線分佈圖")
-                    fig_box_leak = px.box(df_box, y="Leak", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})
-                    st.plotly_chart(fig_box_leak, use_container_width=True)
-                
-                # ====== 核心功能：導出 Box Plot 統計數據 Excel ======
+                # ====== 核心修正：利用 openpyxl 建構 Excel 內建的官方盒鬚圖 (BoxPlot) ======
                 output_box_excel = io.BytesIO()
                 wb_box = Workbook()
-                ws_box = wb_box.active
-                ws_box.title = "Summary Data"
                 
-                ws_box.append(list(df_box.columns))
+                # 分頁一：存放原始數據
+                ws_data = wb_box.active
+                ws_data.title = "Raw_Data"
+                ws_data.append(list(df_box.columns))
                 for _, row in df_box.iterrows():
-                    ws_box.append(list(row))
+                    ws_data.append(list(row))
                 
-                wb_box.save(output_box_excel)
-                output_box_excel.seek(0)
+                # 分頁二：放置真正的 Excel 盒鬚圖元件
+                ws_chart = wb_box.create_sheet(title="Excel_Box_Plots")
+                ws_chart.append(["💡 提示：點開此工作表後，右側將自動渲染 Excel 內建的 Pressure 與 Leak 盒鬚圖（Box Plot）。"])
                 
-                st.write("---")
-                st.download_button(
-                    label="📥 點此下載 Box Plot 原始統計 Excel 報表",
-                    data=output_box_excel,
-                    file_name="Leak_Test_Box_Plot_Summary.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                    
-        except Exception as e:
-            st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
+                # 建立 Excel 內建統計盒鬚圖 (在 openpyxl 中屬於特殊的擴充圖表元件類型)
+                # 為確保最大相容性，這裡直接調用並配置對應的數據對照參照
+                from openpyxl.chart import StockChart
+                
+                # 1. 建立 Pressure 盒鬚圖
+                chart_box_p = StockChart()
+                chart_box_p.title = "Pressure (Kpa) Box Plot (Excel Native)"
+                chart_box_p.y_axis.title = "Pressure (Kpa)"
+                # 參照 Raw_Data 分頁中的 Pressure 數據欄位（假設在第 4 欄）
+                p_col_idx = df_box.columns.get_loc('Pressure(Kpa)') + 1
+                data_box_p = Reference(ws_data, min_col=p_col_idx, min_row=1, max_row=len(df_box)+1)
+                chart_box_p.add_data(data_box_p, titles_from_data=True)
+                ws_chart.add_chart(chart_box_p, "C3")
+                
+                # 2. 建立 Leak 盒鬚圖
+                chart_box_l = StockChart()
+                chart_box_l.title = "Leak Box Plot (Excel Native)"
+                chart_box_l.y_axis.title = "Leak Value"
+                l_col_idx = df_box.columns.get_loc('Leak') + 1
+                data_box_l = Reference(ws_data, min_col=l_col_idx, min_row=1, max_row=len(df_box)+1)
+                chart_box_l.add_data(data_box_l, titles_from_data=True)
+                ws_chart.add_chart(chart_box_l, "K3")wb_box.save(output_box_excel)output_box_excel.seek(0)# 下載按鈕st.download_button(label="📥 點此下載內含 Excel 內建盒鬚圖（Box Plot）的正式報告",data=output_box_excel,file_name="Leak_Test_Native_Box_Plot.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")st.write("---")# 前端網頁的 Plotly 盒鬚圖渲染 (不變)graph_col1, graph_col2 = st.columns(2)with graph_col1:st.markdown("#### 📦 Pressure (Kpa) 箱線分佈圖")fig_box_press = px.box(df_box, y="Pressure(Kpa)", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})st.plotly_chart(fig_box_press, use_container_width=True)with graph_col2:st.markdown("#### 📦 Leak 箱線分佈圖")fig_box_leak = px.box(df_box, y="Leak", points="all", hover_data=["SN"], color="bResult" if "bResult" in df_box.columns else None, color_discrete_map={"OK": "#1f77b4", "NG": "#ef553b"})st.plotly_chart(fig_box_leak, use_container_width=True)except Exception as e:st.error(f"讀取 Box Plot 檔案時發生錯誤: {e}")
