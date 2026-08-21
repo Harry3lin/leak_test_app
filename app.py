@@ -20,7 +20,7 @@ app_mode = st.radio(
 st.write("---")
 
 # ==============================================================================
-# 模式一：Line Plot 趨勢曲線 (第一段：資料流讀取與前置矩陣運算)
+# 模式一：Line Plot 趨勢曲線 (第一段：資料流讀取與基礎結構建立)
 # ==============================================================================
 if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
     st.subheader("趨勢曲線分析 (Line Plot)")
@@ -87,6 +87,10 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                     max_l = raw_max_l + abs(raw_max_l * 0.10) if raw_max_l != 0 else 1.0
                     min_l = raw_min_l - abs(raw_min_l * 0.10) if raw_min_l != 0 else -0.1
                     
+                    # 引入 openpyxl 專用的 ChartLines 物件，避免型態錯誤
+                    from openpyxl.chart.axis import ChartLines
+                    gridlines_obj = ChartLines()
+                    
                     # ----------------- 建立 Excel 壓力高質感深色散佈圖 -----------------
                     chart_p = ScatterChart()
                     chart_p.title = f"SN {sheet_name} - Pressure Trend"
@@ -103,9 +107,9 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                     chart_p.y_axis.scaling.max = max_p
                     chart_p.y_axis.scaling.min = min_p
                     
-                    # 強制開啟主網格線與坐標軸可見度（確保文字刻度 100% 顯現）
-                    chart_p.y_axis.majorGridlines = True
-                    chart_p.x_axis.majorGridlines = True
+                    # 修正型態錯誤：將屬性賦予正確的 ChartLines() 物件，強制開啟主網格線
+                    chart_p.y_axis.majorGridlines = gridlines_obj
+                    chart_p.x_axis.majorGridlines = gridlines_obj
                     chart_p.x_axis.tickLblPos = "nextTo"
                     chart_p.y_axis.tickLblPos = "nextTo"
                     
@@ -137,8 +141,9 @@ if app_mode == "📈 詳細趨勢曲線 (Line Plot Mode)":
                         chart_l.y_axis.scaling.max = max_l
                         chart_l.y_axis.scaling.min = min_l
                         
-                        chart_l.y_axis.majorGridlines = True
-                        chart_l.x_axis.majorGridlines = True
+                        # 修正型態錯誤：將屬性賦予正確的 ChartLines() 物件，強制開啟主網格線
+                        chart_l.y_axis.majorGridlines = gridlines_obj
+                        chart_l.x_axis.majorGridlines = gridlines_obj
                         chart_l.x_axis.tickLblPos = "nextTo"
                         chart_l.y_axis.tickLblPos = "nextTo"
                         
