@@ -6,7 +6,7 @@ import io
 from openpyxl import Workbook
 from openpyxl.chart import Reference
 # 引入 Excel 2016+ 新型擴充圖表專用物件
-from openpyxl.chart.extended import ExtendedChart
+from openpyxl.chart import LineChart, Reference, BarChart
 
 # 1. 設定網頁標題與配置
 st.set_page_config(page_title="氣密測試數據自動化分析看板", layout="wide")
